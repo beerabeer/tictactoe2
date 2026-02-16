@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TicTacToe</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+<style>
+* {
+    box-sizing: border-box;
+    font-family: 'Press Start 2P', monospace;
+}
+
+body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    text-shadow: 2px 2px 0 black;
+}
+
+#bg-video {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: -2;
+}
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: -1;
+}
+
+h1 {
+    font-size: 2.2rem;
+    margin-bottom: 16px;
+}
+
+#container {
+    display: flex;
+    gap: 40px;
+}
+
+/* GAME BOARD */
+#board {
+    display: grid;
+    grid-template-columns: repeat(3, 120px);
+    grid-template-rows: repeat(3, 120px);
+    gap: 14px;
+}
+
+.cell {
+    background: rgba(255,255,255,0.25);
+    border-radius: 18px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 64px;
+    cursor: pointer;
+    user-select: none;
+    transition: transform .15s, background .2s;
+}
+
+.cell:hover {
+    background: rgba(255,255,255,0.4);
+    transform: scale(1.05);
+}
+
+.pop {
+    animation: popIn .25s ease-out;
+}
+
+@keyframes popIn {
+    0% { transform: scale(0); opacity: 0; }
+    70% { transform: scale(1.3); opacity: 1; }
+    100% { transform: scale(1); }
+}
+
+#status {
+    margin-top: 16px;
+    font-size: 1rem;
+    text-align: center;
+}
+
+button {
+    margin-top: 10px;
+    padding: 14px 22px;
+    font-size: 0.7rem;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    color: white;
+    background: linear-gradient(45deg, #ff4d4d, #4da6ff);
+}
+
+/* LEADERBOARD FIX */
+#leaderboard {
+    background: rgba(0,0,0,0.4);
+    padding: 20px 22px;
+    border-radius: 20px;
+    width: 300px;               /* FIX: wider box */
+    min-width: 300px;
+}
+
+#leaderboard h2 {
+    font-size: 0.85rem;
+    text-align: center;
+    margin-bottom: 14px;
+    white-space: nowrap;
+}
+
+/* Prevent text overflow */
+.leader-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.7rem;
+    padding: 8px 0;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.leader-row span {
+    max-width: 70%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#muteBtn {
+    width: 100%;
+    margin-bottom: 12px;
+}
+
+#watermark {
+    position: fixed;
+    bottom: 12px;
+    right: 16px;
+    font-size: 0.6rem;
+    opacity: 0.5;
+}
+</style>
+</head>
+
+<body>
+
+<video id="bg-video" autoplay loop muted playsinline>
+    <source src="file:///C:/Users/abeer/OneDrive/Desktop/web%20dev/assets/Pikachu_Pixel_Animated_Loop(1080p).mp4">
+</video>
+<div class="overlay"></div>
+
+<h1>TICTACTOE</h1>
+
+<div id="container">
+    <div>
+        <div id="board"></div>
+        <div id="status">PLAYER X TURN</div>
+        <button id="reset">RESET GAME</button>
+        <button id="modeBtn">MODE: SINGLE</button>
+    </div>
+
+    <div id="leaderboard">
+        <button id="muteBtn">SOUND: ON</button>
+        <h2>LEADERBOARD</h2>
+        <div class="leader-row"><span>X WINS</span><span id="xWins">0</span></div>
+        <div class="leader-row"><span>O WINS</span><span id="oWins">0</span></div>
+        <div class="leader-row"><span>DRAWS</span><span id="draws">0</span></div>
+    </div>
+</div>
+
+<audio id="clickSound" src="file:///C:/Users/abeer/OneDrive/Desktop/web%20dev/assets/smb_bump.wav"></audio>
+<audio id="bgMusic" src="file:///C:/Users/abeer/OneDrive/Desktop/web%20dev/assets/bgpikachutictactoe.mp3" loop></audio>
+<audio id="winSound" src="file:///C:/Users/abeer/OneDrive/Desktop/web%20dev/assets/smb_stage_clear.wav"></audio>
+<audio id="loseSound" src="file:///C:/Users/abeer/OneDrive/Desktop/web%20dev/assets/smb_mariodie.wav"></audio>
+
+<div id="watermark">- @a.beer.a.dayy</div>
+
+<script>
+const board = document.getElementById("board");
+const statusText = document.getElementById("status");
+const resetBtn = document.getElementById("reset");
+const modeBtn = document.getElementById("modeBtn");
+const muteBtn = document.getElementById("muteBtn");
+
+const clickSound = document.getElementById("clickSound");
+const bgMusic = document.getElementById("bgMusic");
+const winSound = document.getElementById("winSound");
+const loseSound = document.getElementById("loseSound");
+
+let muted = false;
+let gameState = Array(9).fill("");
+let currentPlayer = "X";
+let gameActive = true;
+let singlePlayer = true;
+
+let leaderboard = JSON.parse(localStorage.getItem("tttLeaderboard")) || {
+    xWins: 0,
+    oWins: 0,
+    draws: 0
+};
+
+const xWinsEl = document.getElementById("xWins");
+const oWinsEl = document.getElementById("oWins");
+const drawsEl = document.getElementById("draws");
+
+function updateLeaderboardUI() {
+    xWinsEl.textContent = leaderboard.xWins;
+    oWinsEl.textContent = leaderboard.oWins;
+    drawsEl.textContent = leaderboard.draws;
+}
+updateLeaderboardUI();
+
+bgMusic.volume = 0.25;
+
+document.body.addEventListener("click", () => {
+    if (!muted && bgMusic.paused) bgMusic.play();
+}, { once: true });
+
+const winConditions = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+];
+
+for (let i = 0; i < 9; i++) {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    cell.dataset.index = i;
+    cell.onclick = handleClick;
+    board.appendChild(cell);
+}
+
+function handleClick(e) {
+    const index = e.target.dataset.index;
+    if (!gameActive || gameState[index]) return;
+
+    playClick();
+    makeMove(index, currentPlayer);
+
+    if (singlePlayer && gameActive && currentPlayer === "O") {
+        setTimeout(systemMove, 400);
+    }
+}
+
+function playClick() {
+    if (muted) return;
+    clickSound.currentTime = 0;
+    clickSound.play();
+}
+
+function playEndSound(sound) {
+    if (muted) return;
+    bgMusic.pause();
+    sound.currentTime = 0;
+    sound.play();
+    sound.onended = () => {
+        if (!muted) bgMusic.play();
+    };
+}
+
+function makeMove(index, player) {
+    gameState[index] = player;
+    document.querySelector(`.cell[data-index='${index}']`).innerText = player;
+
+    if (checkWin(player)) {
+        statusText.innerText = `PLAYER ${player} WINS`;
+        gameActive = false;
+        updateLeaderboard(player);
+        playEndSound(player === "O" && singlePlayer ? loseSound : winSound);
+        return;
+    }
+
+    if (gameState.every(c => c)) {
+        statusText.innerText = "DRAW";
+        gameActive = false;
+        updateLeaderboard("draw");
+        return;
+    }
+
+    currentPlayer = player === "X" ? "O" : "X";
+    statusText.innerText = `PLAYER ${currentPlayer} TURN`;
+}
+
+function systemMove() {
+    let move =
+        findCriticalMove("O") ??
+        findCriticalMove("X") ??
+        (gameState[4] === "" ? 4 : null);
+
+    if (move === null) {
+        move = gameState.findIndex(v => v === "");
+    }
+
+    playClick();
+    makeMove(move, "O");
+}
+
+function findCriticalMove(player) {
+    for (const combo of winConditions) {
+        const values = combo.map(i => gameState[i]);
+        if (values.filter(v => v === player).length === 2 && values.includes("")) {
+            return combo[values.indexOf("")];
+        }
+    }
+    return null;
+}
+
+function checkWin(player) {
+    return winConditions.some(combo =>
+        combo.every(i => gameState[i] === player)
+    );
+}
+
+function updateLeaderboard(result) {
+    if (result === "X") leaderboard.xWins++;
+    else if (result === "O") leaderboard.oWins++;
+    else leaderboard.draws++;
+
+    localStorage.setItem("tttLeaderboard", JSON.stringify(leaderboard));
+    updateLeaderboardUI();
+}
+
+resetBtn.onclick = () => {
+    gameState.fill("");
+    gameActive = true;
+    currentPlayer = "X";
+    statusText.innerText = "PLAYER X TURN";
+    document.querySelectorAll(".cell").forEach(c => c.innerText = "");
+};
+
+modeBtn.onclick = () => {
+    singlePlayer = !singlePlayer;
+    modeBtn.innerText = singlePlayer ? "MODE: SINGLE" : "MODE: TWO";
+    resetBtn.click();
+};
+
+muteBtn.onclick = () => {
+    muted = !muted;
+    [bgMusic, clickSound, winSound, loseSound].forEach(a => a.muted = muted);
+    muteBtn.innerText = muted ? "SOUND: OFF" : "SOUND: ON";
+};
+</script>
+
+</body>
+</html>
